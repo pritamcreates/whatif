@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What If — Money Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #E24B4A;
+    --red-light: #FCEBEB;
+    --red-dark: #791F1F;
+    --green: #3B6D11;
+    --green-mid: #639922;
+    --green-light: #EAF3DE;
+    --green-dark: #173404;
+    --white: #FAFAF8;
+    --off: #F4F3EF;
+    --border: #E2E1DA;
+    --text: #1A1A18;
+    --muted: #6B6B67;
+    --mono: 'Montserrat', sans-serif;
+    --sans: 'Montserrat', sans-serif;
+    --serif: 'Montserrat', sans-serif;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--white);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--white);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .topbar-logo {
+    font-family: var(--serif);
+    font-size: 17px;
+    letter-spacing: -0.3px;
+  }
+  .topbar-logo span { color: var(--green); font-style: italic; }
+  .topbar-center {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .week-pill {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--off);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 10px;
+    color: var(--muted);
+  }
+  .topbar-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .streak-badge {
+    font-size: 11px;
+    font-family: var(--mono);
+    background: var(--green-light);
+    color: var(--green);
+    border-radius: 20px;
+    padding: 3px 10px;
+    border: 1px solid #C0DD97;
+    display: none;
+  }
+  .streak-badge.show { display: block; }
+
+  /* RATIO BAR */
+  .ratio-bar-wrap {
+    padding: 0 2rem;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--white);
+  }
+  .ratio-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .ratio-track {
+    flex: 1;
+    height: 6px;
+    background: var(--red-light);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .ratio-fill {
+    height: 100%;
+    background: var(--green-mid);
+    border-radius: 3px;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+    width: 0%;
+  }
+  .ratio-nums {
+    font-family: var(--mono);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .ratio-nums .s { color: var(--green); }
+  .ratio-nums .w { color: var(--red); }
+
+  /* MAIN SPLIT */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    flex: 1;
+    overflow: hidden;
+  }
+  .divider { background: var(--border); }
+
+  /* PANELS */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 1rem 1.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .panel-amount {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -1px;
+  }
+  .waste-panel .panel-amount { color: var(--red); }
+  .save-panel .panel-amount { color: var(--green); }
+
+  /* FEED */
+  .feed {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .feed::-webkit-scrollbar { width: 3px; }
+  .feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .entry-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--white);
+    font-size: 13px;
+    animation: slideIn 0.25s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .entry-card.waste { border-left: 2px solid var(--red); }
+  .entry-card.save { border-left: 2px solid var(--green-mid); }
+  .entry-icon { font-size: 14px; color: var(--muted); flex-shrink: 0; }
+  .entry-main { flex: 1; min-width: 0; }
+  .entry-name { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .entry-date { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .entry-amount { font-family: var(--mono); font-size: 13px; font-weight: 500; flex-shrink: 0; }
+  .entry-card.waste .entry-amount { color: var(--red); }
+  .entry-card.save .entry-amount { color: var(--green); }
+  .verified-badge {
+    font-size: 10px;
+    background: var(--green-light);
+    color: var(--green);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: var(--mono);
+    flex-shrink: 0;
+  }
+  .unverified-badge {
+    font-size: 10px;
+    background: #FFF8E6;
+    color: #854F0B;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: var(--mono);
+    flex-shrink: 0;
+  }
+
+  /* WEEKLY GRID */
+  .weekly-section {
+    border-top: 1px solid var(--border);
+    padding: 0.75rem 1.5rem;
+    flex-shrink: 0;
+  }
+  .weekly-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .day-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .day-name { font-size: 9px; font-family: var(--mono); color: var(--muted); }
+  .day-bar-track {
+    width: 100%;
+    height: 36px;
+    background: var(--off);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+  .day-bar-fill {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.4s ease;
+  }
+  .waste-bar { background: var(--red); opacity: 0.7; }
+  .save-bar { background: var(--green-mid); opacity: 0.85; }
+  .day-val { font-size: 9px; font-family: var(--mono); color: var(--muted); }
+
+  /* INPUT AREA */
+  .input-area {
+    border-top: 1px solid var(--border);
+    padding: 0.75rem 1.5rem;
+    flex-shrink: 0;
+    background: var(--off);
+  }
+  .input-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .input-name {
+    flex: 1;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 10px;
+    font-family: var(--sans);
+    font-size: 13px;
+    background: var(--white);
+    color: var(--text);
+    outline: none;
+    min-width: 0;
+  }
+  .input-name:focus { border-color: #97C459; }
+  .input-amount {
+    width: 90px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--white);
+    color: var(--text);
+    outline: none;
+  }
+  .input-amount:focus { border-color: #97C459; }
+  .btn-log {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 6px;
+    border: none;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .btn-log:active { opacity: 0.8; }
+  .btn-waste { background: var(--red); color: #fff; }
+  .btn-save { background: var(--green); color: #fff; }
+
+  /* FLASH OVERLAY */
+  .flash-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .flash-overlay.show { display: flex; }
+  .flash-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 0;
+  }
+  .flash-bg { background: rgba(26,26,24,0.45); }
+
+  .flash-box {
+    position: relative;
+    z-index: 1;
+    max-width: 480px;
+    width: 90%;
+    background: var(--white);
+    border-radius: 12px;
+    padding: 2.5rem 2.5rem 2rem;
+    text-align: center;
+    pointer-events: auto;
+    animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes popIn {
+    from { transform: scale(0.9); }
+    to { transform: scale(1); }
+  }
+  .flash-waste .flash-box { border: 1.5px solid var(--red); }
+  .flash-save .flash-box { border: 1.5px solid var(--green-mid); }
+
+  .flash-headline {
+    font-family: var(--serif);
+    font-size: 26px;
+    line-height: 1.2;
+    margin-bottom: 0.75rem;
+  }
+  .flash-waste .flash-headline { color: var(--red-dark); }
+  .flash-save .flash-headline { color: var(--green-dark); }
+
+  .flash-sub {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+  .flash-amount-big {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+    letter-spacing: -1px;
+  }
+  .flash-waste .flash-amount-big { color: var(--red); }
+  .flash-save .flash-amount-big { color: var(--green); }
+
+  .flash-deposit-q {
+    background: var(--green-light);
+    border: 1px solid #C0DD97;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    text-align: left;
+  }
+  .flash-deposit-q p {
+    font-size: 13px;
+    color: var(--green-dark);
+    margin-bottom: 0.6rem;
+    font-weight: 500;
+  }
+  .flash-deposit-q small {
+    font-size: 11px;
+    color: var(--green);
+    font-family: var(--mono);
+  }
+  .flash-btn-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .flash-btn {
+    height: 36px;
+    padding: 0 20px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--white);
+    color: var(--text);
+    transition: background 0.15s;
+  }
+  .flash-btn:hover { background: var(--off); }
+  .flash-btn.primary-green { background: var(--green); color: #fff; border-color: var(--green); }
+  .flash-btn.primary-green:hover { background: var(--green-mid); }
+  .flash-btn.primary-red { background: var(--red); color: #fff; border-color: var(--red); }
+  .flash-btn.primary-red:hover { opacity: 0.9; }
+
+  .streak-announcement {
+    background: var(--green-light);
+    border: 1px solid #C0DD97;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 13px;
+    color: var(--green-dark);
+    display: none;
+  }
+  .streak-announcement.show { display: block; }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 6px;
+    color: var(--muted);
+  }
+  .empty-state i { font-size: 24px; opacity: 0.3; }
+  .empty-state p { font-size: 12px; font-family: var(--mono); opacity: 0.5; }
+
+  input::placeholder { color: #B4B2A9; }
+
+  /* REPORT MODAL */
+  .report-btn {
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    background: var(--white);
+    color: var(--muted);
+  }
+  .report-btn:hover { background: var(--off); }
+  .report-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 200;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    background: rgba(26,26,24,0.55);
+    overflow-y: auto;
+    padding: 2rem 1rem;
+  }
+  .report-overlay.show { display: flex; }
+  .report-box {
+    background: var(--white);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 560px;
+    padding: 2rem;
+    position: relative;
+  }
+  .report-close {
+    position: absolute;
+    top: 1rem; right: 1rem;
+    background: none; border: none;
+    font-size: 18px; cursor: pointer;
+    color: var(--muted);
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+  }
+  .report-close:hover { background: var(--off); }
+  .report-title {
+    font-family: var(--serif);
+    font-size: 20px;
+    margin-bottom: 0.25rem;
+  }
+  .report-period {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+  .report-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+  .report-stat {
+    background: var(--off);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+  }
+  .report-stat-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .report-stat-val {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .report-stat-val.green { color: var(--green); }
+  .report-stat-val.red { color: var(--red); }
+  .report-section-title {
+    font-size: 11px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    margin-top: 1.25rem;
+  }
+  .report-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .report-row:last-child { border-bottom: none; }
+  .report-row-name { color: var(--text); }
+  .report-row-amt { font-family: var(--mono); font-weight: 500; }
+  .report-row-amt.green { color: var(--green); }
+  .report-row-amt.red { color: var(--red); }
+  .report-verdict {
+    margin-top: 1.25rem;
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    font-family: var(--serif);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .report-verdict.winning { background: var(--green-light); color: var(--green-dark); border: 1px solid #C0DD97; }
+  .report-verdict.losing { background: var(--red-light); color: var(--red-dark); border: 1px solid #F7C1C1; }
+  .report-verified-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-top: 0.5rem;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">What <span>If?</span></div>
+  <div class="topbar-center">
+    <span class="week-pill" id="weekLabel">Week —</span>
+  </div>
+  <div class="topbar-right">
+    <span class="streak-badge" id="streakBadge"></span>
+    <button class="report-btn" onclick="openReport()">Weekly Report</button>
+  </div>
+</div>
+
+<!-- RATIO BAR -->
+<div class="ratio-bar-wrap">
+  <span class="ratio-label">Today</span>
+  <div class="ratio-track">
+    <div class="ratio-fill" id="ratioFill"></div>
+  </div>
+  <span class="ratio-nums"><span class="s" id="ratioSaved">₹0 saved</span> &nbsp;/&nbsp; <span class="w" id="ratioWasted">₹0 wasted</span></span>
+</div>
+
+<!-- MAIN SPLIT -->
+<div class="main">
+
+  <!-- WASTE PANEL -->
+  <div class="panel waste-panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="ti ti-trending-down" aria-hidden="true"></i> &nbsp;Money Wasted</div>
+      <div class="panel-amount" id="totalWaste">₹0</div>
+    </div>
+    <div class="feed" id="wasteFeed">
+      <div class="empty-state" id="wasteEmpty">
+        <i class="ti ti-ghost" aria-hidden="true"></i>
+        <p>No waste logged yet.</p>
+      </div>
+    </div>
+    <div class="weekly-section">
+      <div class="weekly-label">This week — waste per day</div>
+      <div class="week-grid" id="wasteGrid"></div>
+    </div>
+    <div class="input-area">
+      <div class="input-row">
+        <input class="input-name" id="wasteName" type="text" placeholder="What did you spend on?">
+        <input class="input-amount" id="wasteAmt" type="number" placeholder="₹ amt" min="1">
+        <button class="btn-log btn-waste" onclick="logEntry('waste')">Log Waste</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SAVE PANEL -->
+  <div class="panel save-panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="ti ti-trending-up" aria-hidden="true"></i> &nbsp;Money Saved</div>
+      <div class="panel-amount" id="totalSave">₹0</div>
+    </div>
+    <div class="feed" id="saveFeed">
+      <div class="empty-state" id="saveEmpty">
+        <i class="ti ti-plant" aria-hidden="true"></i>
+        <p>No savings logged yet.</p>
+      </div>
+    </div>
+    <div class="weekly-section">
+      <div class="weekly-label">This week — savings per day</div>
+      <div class="week-grid" id="saveGrid"></div>
+    </div>
+    <div class="input-area">
+      <div class="input-row">
+        <input class="input-name" id="saveName" type="text" placeholder="What did you save instead?">
+        <input class="input-amount" id="saveAmt" type="number" placeholder="₹ amt" min="1">
+        <button class="btn-log btn-save" onclick="logEntry('save')">Log Saving</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FLASH OVERLAY -->
+<div class="flash-overlay" id="flashOverlay">
+  <div class="flash-bg" onclick="closeFlash()"></div>
+  <div class="flash-box" id="flashBox">
+    <div class="flash-headline" id="flashHeadline"></div>
+    <div class="flash-amount-big" id="flashAmount"></div>
+    <div class="flash-sub" id="flashSub"></div>
+    <div class="streak-announcement" id="streakAnnounce"></div>
+    <div class="flash-deposit-q" id="depositQ" style="display:none">
+      <p>Did you actually deposit this in your savings account?</p>
+      <small>Unverified saves are tracked separately. Be honest with yourself.</small>
+    </div>
+    <div class="flash-btn-row" id="flashBtnRow"></div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function todayStr() { return localDateStr(new Date()); }
+function weekKey() {
+  const d = new Date();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return localDateStr(monday);
+}
+function formatDate(str) {
+  const [y,m,dd] = str.split('-');
+  return dd + ' ' + MONTHS[parseInt(m)-1];
+}
+function fmt(n) { return '₹' + Number(n).toLocaleString('en-IN'); }
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem('whatif_data') || '{"entries":[]}'); }
+  catch(e) { return { entries: [] }; }
+}
+function saveData(d) { localStorage.setItem('whatif_data', JSON.stringify(d)); }
+
+const WASTE_MESSAGES = [
+  ["You did it again.", "That money is gone. It bought you nothing that lasts."],
+  ["Really?", "Another round. Another day that future-you will resent present-you for."],
+  ["You chose this.", "Over every goal you said you had. Over your own future. You chose this."],
+  ["This is becoming a pattern.", "Not occasional. Not harmless. A pattern. And patterns become your life."],
+  ["Do you even feel it anymore?", "The amount doesn't matter now — the habit is the problem. And you know it."],
+  ["This is who you are right now.", "Not who you want to be. Who you are. Change it, or accept it."],
+  ["Your future self is watching.", "And they are not proud of what they see today."],
+];
+
+const SAVE_MESSAGES = [
+  ["That's the move.", "You chose your future over a fleeting moment. That's rare. Keep it."],
+  ["Compounding starts here.", "Small. Consistent. Unstoppable. You just added another brick."],
+  ["This is discipline.", "Not a fluke. Not luck. A choice you made, consciously, today."],
+  ["Future you is grateful.", "Right now. At this exact moment. Future you is relieved you did this."],
+  ["The gap is widening.", "Between where you were and where you're going. You're building something real."],
+];
+
+function getWasteMessage(weekWasteCount) {
+  const idx = Math.min(Math.floor(weekWasteCount / 2), WASTE_MESSAGES.length - 1);
+  return WASTE_MESSAGES[idx];
+}
+function getSaveMessage() {
+  return SAVE_MESSAGES[Math.floor(Math.random() * SAVE_MESSAGES.length)];
+}
+
+let pendingEntry = null;
+let pendingVerified = false;
+
+function logEntry(type) {
+  const nameEl = document.getElementById(type === 'waste' ? 'wasteName' : 'saveName');
+  const amtEl = document.getElementById(type === 'waste' ? 'wasteAmt' : 'saveAmt');
+  const name = nameEl.value.trim();
+  const amt = parseFloat(amtEl.value);
+  if (!name || !amt || amt <= 0) { nameEl.focus(); return; }
+
+  pendingEntry = { type, name, amount: amt, date: todayStr(), verified: false };
+  nameEl.value = ''; amtEl.value = '';
+
+  if (type === 'waste') showWasteFlash(amt);
+  else showSaveFlash(amt);
+}
+
+function showWasteFlash(amt) {
+  const data = loadData();
+  const wk = weekKey();
+  const weekWaste = data.entries.filter(e => e.type === 'waste' && e.date >= wk);
+  const [headline, sub] = getWasteMessage(weekWaste.length);
+
+  const fl = document.getElementById('flashOverlay');
+  const fb = document.getElementById('flashBox');
+  fl.className = 'flash-overlay show flash-waste';
+  fb.className = 'flash-box';
+  document.getElementById('flashHeadline').textContent = headline;
+  document.getElementById('flashAmount').textContent = fmt(amt);
+  document.getElementById('flashSub').textContent = sub;
+  document.getElementById('depositQ').style.display = 'none';
+  document.getElementById('streakAnnounce').className = 'streak-announcement';
+  document.getElementById('flashBtnRow').innerHTML =
+    `<button class="flash-btn primary-red" onclick="confirmEntry(false)">I spent it. Log it.</button>
+     <button class="flash-btn" onclick="closeFlash()">Wait, I didn't</button>`;
+}
+
+function showSaveFlash(amt) {
+  const data = loadData();
+  const wk = weekKey();
+  const name = pendingEntry.name;
+  const streak = getActivityStreak(data, name, 'save');
+  const [headline, sub] = getSaveMessage();
+
+  const fl = document.getElementById('flashOverlay');
+  const fb = document.getElementById('flashBox');
+  fl.className = 'flash-overlay show flash-save';
+  fb.className = 'flash-box';
+  document.getElementById('flashHeadline').textContent = headline;
+  document.getElementById('flashAmount').textContent = fmt(amt);
+  document.getElementById('flashSub').textContent = sub;
+  document.getElementById('depositQ').style.display = 'block';
+
+  const sa = document.getElementById('streakAnnounce');
+  if (streak > 1) {
+    sa.className = 'streak-announcement show';
+    sa.textContent = streak + '-day streak on "' + name + '". That\'s not luck. That\'s identity.';
+  } else {
+    sa.className = 'streak-announcement';
+  }
+
+  document.getElementById('flashBtnRow').innerHTML =
+    `<button class="flash-btn primary-green" onclick="confirmEntry(true)">Yes — deposited</button>
+     <button class="flash-btn" onclick="confirmEntry(false)">Not yet</button>
+     <button class="flash-btn" onclick="closeFlash()">Cancel</button>`;
+}
+
+function getActivityStreak(data, activityName, type) {
+  const norm = activityName.toLowerCase();
+  const matching = data.entries
+    .filter(e => e.type === type && e.name.toLowerCase() === norm)
+    .map(e => e.date)
+    .sort()
+    .reverse();
+  if (!matching.length) return 0;
+  let streak = 1;
+  let prev = new Date(matching[0]);
+  for (let i = 1; i < matching.length; i++) {
+    const cur = new Date(matching[i]);
+    const diff = (prev - cur) / 86400000;
+    if (diff === 1) { streak++; prev = cur; }
+    else break;
+  }
+  return streak;
+}
+
+function confirmEntry(verified) {
+  if (!pendingEntry) { closeFlash(); return; }
+  pendingEntry.verified = verified;
+  const data = loadData();
+  data.entries.push(pendingEntry);
+  saveData(data);
+  pendingEntry = null;
+  closeFlash();
+  render();
+}
+
+function closeFlash() {
+  document.getElementById('flashOverlay').className = 'flash-overlay';
+  pendingEntry = null;
+}
+
+function render() {
+  const data = loadData();
+  const today = todayStr();
+  const wk = weekKey();
+
+  const todayEntries = data.entries.filter(e => e.date === today);
+  const todayWaste = todayEntries.filter(e=>e.type==='waste').reduce((s,e)=>s+e.amount,0);
+  const todaySave = todayEntries.filter(e=>e.type==='save').reduce((s,e)=>s+e.amount,0);
+  const total = todayWaste + todaySave;
+  const savePct = total > 0 ? (todaySave / total * 100) : 0;
+
+  document.getElementById('ratioFill').style.width = savePct + '%';
+  document.getElementById('ratioSaved').textContent = fmt(todaySave) + ' saved';
+  document.getElementById('ratioWasted').textContent = fmt(todayWaste) + ' wasted';
+
+  const allWaste = data.entries.filter(e=>e.type==='waste').reduce((s,e)=>s+e.amount,0);
+  const allSave = data.entries.filter(e=>e.type==='save').reduce((s,e)=>s+e.amount,0);
+  document.getElementById('totalWaste').textContent = fmt(allWaste);
+  document.getElementById('totalSave').textContent = fmt(allSave);
+
+  renderFeed('waste', data);
+  renderFeed('save', data);
+  renderWeekGrid('waste', data, wk);
+  renderWeekGrid('save', data, wk);
+  renderStreakBadge(data, wk);
+  renderWeekLabel(wk);
+}
+
+function renderFeed(type, data) {
+  const feed = document.getElementById(type + 'Feed');
+  const empty = document.getElementById(type + 'Empty');
+  const entries = data.entries.filter(e=>e.type===type).reverse();
+  if (!entries.length) { empty.style.display = 'flex'; return; }
+  empty.style.display = 'none';
+  empty.style.flex = 'unset';
+  const existing = feed.querySelectorAll('.entry-card');
+  existing.forEach(el=>el.remove());
+
+  entries.slice(0,40).forEach(e => {
+    const card = document.createElement('div');
+    card.className = 'entry-card ' + type;
+    const icon = type === 'waste'
+      ? '<i class="ti ti-arrow-down-right entry-icon" aria-hidden="true"></i>'
+      : '<i class="ti ti-arrow-up-right entry-icon" aria-hidden="true"></i>';
+    let badge = '';
+    if (type === 'save') {
+      badge = e.verified
+        ? '<span class="verified-badge">deposited</span>'
+        : '<span class="unverified-badge">unverified</span>';
+    }
+    card.innerHTML = `${icon}
+      <div class="entry-main">
+        <div class="entry-name">${e.name}</div>
+        <div class="entry-date">${formatDate(e.date)}</div>
+      </div>
+      <div class="entry-amount">${type==='waste'?'-':'+'} ${fmt(e.amount)}</div>
+      ${badge}`;
+    feed.appendChild(card);
+  });
+}
+
+function renderWeekGrid(type, data, wkStart) {
+  const grid = document.getElementById(type + 'Grid');
+  grid.innerHTML = '';
+  const wkDate = new Date(wkStart + 'T00:00:00');
+
+  const days7 = [];
+  for (let i=0;i<7;i++) {
+    const d = new Date(wkDate);
+    d.setDate(wkDate.getDate() + i);
+    days7.push(localDateStr(d));
+  }
+
+  const maxAmt = Math.max(1, ...days7.map(d => data.entries.filter(e=>e.type===type&&e.date===d).reduce((s,e)=>s+e.amount,0)));
+
+  days7.forEach((d, i) => {
+    const amt = data.entries.filter(e=>e.type===type&&e.date===d).reduce((s,e)=>s+e.amount,0);
+    const pct = (amt / maxAmt * 100);
+    const dayName = DAYS[i % 7];
+    const col = document.createElement('div');
+    col.className = 'day-col';
+    col.innerHTML = `<div class="day-name">${dayName}</div>
+      <div class="day-bar-track">
+        <div class="day-bar-fill ${type === 'waste' ? 'waste-bar' : 'save-bar'}" style="height:${amt>0?Math.max(pct,8):0}%"></div>
+      </div>
+      <div class="day-val">${amt > 0 ? ('₹' + (amt >= 1000 ? Math.round(amt/1000)+'k' : amt)) : ''}</div>`;
+    grid.appendChild(col);
+  });
+}
+
+function renderStreakBadge(data, wk) {
+  const wkDate = new Date(wk + 'T00:00:00');
+  const days7 = [];
+  for (let i=0;i<7;i++) {
+    const d = new Date(wkDate);
+    d.setDate(wkDate.getDate() + i);
+    days7.push(localDateStr(d));
+  }
+  const today = todayStr();
+  const pastDays = days7.filter(d => d <= today);
+  const cleanDays = pastDays.filter(d => data.entries.filter(e=>e.type==='waste'&&e.date===d).length === 0 && data.entries.filter(e=>e.type==='save'&&e.date===d).length > 0);
+  const badge = document.getElementById('streakBadge');
+  if (cleanDays.length >= 2) {
+    badge.textContent = cleanDays.length + '-day clean streak';
+    badge.className = 'streak-badge show';
+  } else {
+    badge.className = 'streak-badge';
+  }
+}
+
+function renderWeekLabel(wk) {
+  const d = new Date(wk + 'T00:00:00');
+  const end = new Date(d);
+  end.setDate(d.getDate() + 6);
+  document.getElementById('weekLabel').textContent =
+    d.getDate() + ' ' + MONTHS[d.getMonth()] + ' – ' + end.getDate() + ' ' + MONTHS[end.getMonth()];
+}
+
+document.getElementById('wasteAmt').addEventListener('keydown', e => { if(e.key==='Enter') logEntry('waste'); });
+document.getElementById('saveAmt').addEventListener('keydown', e => { if(e.key==='Enter') logEntry('save'); });
+
+
+function openReport() {
+  const data = loadData();
+  const wk = weekKey();
+  const wkDate = new Date(wk + 'T00:00:00');
+  const end = new Date(wkDate); end.setDate(wkDate.getDate() + 6);
+  document.getElementById('reportPeriod').textContent =
+    wkDate.getDate() + ' ' + MONTHS[wkDate.getMonth()] + ' – ' + end.getDate() + ' ' + MONTHS[end.getMonth()];
+
+  const days7 = [];
+  for (let i=0;i<7;i++) { const d=new Date(wkDate); d.setDate(wkDate.getDate()+i); days7.push(localDateStr(d)); }
+
+  const wkEntries = data.entries.filter(e => days7.includes(e.date));
+  const wkWaste = wkEntries.filter(e=>e.type==='waste');
+  const wkSave = wkEntries.filter(e=>e.type==='save');
+
+  const totalSave = wkSave.reduce((s,e)=>s+e.amount,0);
+  const totalWaste = wkWaste.reduce((s,e)=>s+e.amount,0);
+  const net = totalSave - totalWaste;
+
+  document.getElementById('rTotalSave').textContent = fmt(totalSave);
+  document.getElementById('rTotalWaste').textContent = fmt(totalWaste);
+  const netEl = document.getElementById('rNet');
+  netEl.textContent = (net >= 0 ? '+' : '') + fmt(Math.abs(net));
+  netEl.className = 'report-stat-val ' + (net >= 0 ? 'green' : 'red');
+
+  const verified = wkSave.filter(e=>e.verified).reduce((s,e)=>s+e.amount,0);
+  const unverified = wkSave.filter(e=>!e.verified).reduce((s,e)=>s+e.amount,0);
+  document.getElementById('rVerified').textContent = 'Deposited: ' + fmt(verified);
+  document.getElementById('rUnverified').textContent = 'Unverified: ' + fmt(unverified);
+
+  function groupBy(entries) {
+    const map = {};
+    entries.forEach(e => { map[e.name] = (map[e.name]||0) + e.amount; });
+    return Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  }
+
+  function renderList(id, entries, cls) {
+    const el = document.getElementById(id);
+    const groups = groupBy(entries);
+    if (!groups.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:var(--mono);padding:6px 0">No entries this week</div>'; return; }
+    el.innerHTML = groups.map(([name,amt]) =>
+      '<div class="report-row"><span class="report-row-name">'+name+'</span><span class="report-row-amt '+cls+'">'+fmt(amt)+'</span></div>'
+    ).join('');
+  }
+
+  renderList('rWasteList', wkWaste, 'red');
+  renderList('rSaveList', wkSave, 'green');
+
+  const verdict = document.getElementById('rVerdict');
+  if (totalWaste === 0 && totalSave === 0) {
+    verdict.style.display = 'none';
+  } else {
+    verdict.style.display = 'block';
+    if (net >= 0) {
+      verdict.className = 'report-verdict winning';
+      verdict.textContent = net === 0
+        ? 'You broke even this week. Every rupee wasted was matched by a save. Aim higher next week.'
+        : 'You came out ahead by ' + fmt(net) + ' this week. That is not luck — that is a decision repeated daily.';
+    } else {
+      verdict.className = 'report-verdict losing';
+      verdict.textContent = 'You spent ' + fmt(Math.abs(net)) + ' more than you saved this week. The numbers do not lie. Next week is a chance to reverse this.';
+    }
+  }
+
+  document.getElementById('reportOverlay').className = 'report-overlay show';
+}
+function closeReport() {
+  document.getElementById('reportOverlay').className = 'report-overlay';
+}
+
+render();
+</script>
+
+<!-- REPORT OVERLAY -->
+<div class="report-overlay" id="reportOverlay">
+  <div class="report-box">
+    <button class="report-close" onclick="closeReport()" aria-label="Close">
+      <i class="ti ti-x" aria-hidden="true"></i>
+    </button>
+    <div class="report-title">Weekly Report</div>
+    <div class="report-period" id="reportPeriod"></div>
+    <div class="report-stats">
+      <div class="report-stat">
+        <div class="report-stat-label">Total Saved</div>
+        <div class="report-stat-val green" id="rTotalSave">₹0</div>
+      </div>
+      <div class="report-stat">
+        <div class="report-stat-label">Total Wasted</div>
+        <div class="report-stat-val red" id="rTotalWaste">₹0</div>
+      </div>
+      <div class="report-stat">
+        <div class="report-stat-label">Net</div>
+        <div class="report-stat-val" id="rNet">₹0</div>
+      </div>
+    </div>
+    <div class="report-verified-row">
+      <span id="rVerified"></span>
+      <span id="rUnverified"></span>
+    </div>
+    <div class="report-section-title">Top waste categories</div>
+    <div id="rWasteList"></div>
+    <div class="report-section-title">Top savings categories</div>
+    <div id="rSaveList"></div>
+    <div class="report-verdict" id="rVerdict"></div>
+  </div>
+</div>
+
+</body>
+</html>
