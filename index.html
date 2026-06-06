@@ -446,6 +446,75 @@
   .empty-state p { font-size: 12px; font-family: var(--mono); opacity: 0.5; }
 
   input::placeholder { color: #B4B2A9; }
+  /* DAILY CHECK-IN BANNER */
+  .checkin-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    height: 36px;
+    background: #FFFBEB;
+    border-bottom: 1px solid #F0E68C;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #7A5F00;
+    font-weight: 500;
+  }
+  .checkin-banner.show { display: flex; }
+  .checkin-banner-btns { display: flex; gap: 6px; }
+  .checkin-btn {
+    height: 24px; padding: 0 10px; border-radius: 20px;
+    border: 1px solid #D4AF37; font-size: 11px; font-family: var(--mono);
+    cursor: pointer; font-weight: 500;
+  }
+  .checkin-btn.clean { background: var(--green); color: #fff; border-color: var(--green); }
+  .checkin-btn.dismiss { background: transparent; color: #7A5F00; }
+
+  /* STREAK WALL */
+  .streak-wall {
+    padding: 0.5rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--off);
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .streak-wall.show { display: flex; }
+  .streak-wall-label {
+    font-size: 10px; font-family: var(--mono); color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    width: 100%; margin-bottom: 2px;
+  }
+  .streak-chip {
+    font-size: 10px; font-family: var(--mono);
+    background: var(--white); border: 1px solid var(--border);
+    border-radius: 20px; padding: 2px 10px; color: var(--text);
+  }
+  .streak-chip.best { border-color: #C0DD97; background: var(--green-light); color: var(--green-dark); }
+
+  /* WHAT IF PROJECTION ROW */
+  .projection-row {
+    margin-top: 4px;
+    padding: 6px 10px;
+    background: var(--green-light);
+    border-radius: 6px;
+    border: 1px solid #C0DD97;
+    font-size: 11px;
+    color: var(--green-dark);
+    font-family: var(--mono);
+    display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  .proj-item { display: flex; flex-direction: column; gap: 1px; }
+  .proj-item span:first-child { font-size: 9px; color: var(--green); text-transform: uppercase; letter-spacing: 0.05em; }
+  .proj-item span:last-child { font-weight: 600; }
+
+  /* HONESTY SCORE in report */
+  .honesty-bar-wrap { margin-top: 1rem; }
+  .honesty-label { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .honesty-track { height: 6px; background: var(--off); border-radius: 3px; overflow: hidden; }
+  .honesty-fill { height: 100%; background: var(--green-mid); border-radius: 3px; transition: width 0.6s ease; }
+
 
   /* REPORT MODAL */
   .report-btn {
@@ -592,6 +661,21 @@
     <div class="ratio-fill" id="ratioFill"></div>
   </div>
   <span class="ratio-nums"><span class="s" id="ratioSaved">₹0 saved</span> &nbsp;/&nbsp; <span class="w" id="ratioWasted">₹0 wasted</span></span>
+</div>
+
+
+<!-- DAILY CHECK-IN BANNER -->
+<div class="checkin-banner" id="checkinBanner">
+  <span>How was your day so far? No entries logged today yet.</span>
+  <div class="checkin-banner-btns">
+    <button class="checkin-btn clean" onclick="markCleanDay()">Clean day — no waste</button>
+    <button class="checkin-btn dismiss" onclick="dismissCheckin()">I'll log as I go</button>
+  </div>
+</div>
+
+<!-- STREAK WALL -->
+<div class="streak-wall" id="streakWall">
+  <div class="streak-wall-label">Personal bests</div>
 </div>
 
 <!-- MAIN SPLIT -->
@@ -805,6 +889,64 @@ function getActivityStreak(data, activityName, type) {
   return streak;
 }
 
+
+function markCleanDay() {
+  const data = loadData();
+  const today = todayStr();
+  data.entries.push({ type: 'clean', name: 'Clean day', amount: 0, date: today, verified: true });
+  saveData(data);
+  dismissCheckin();
+  render();
+}
+
+function dismissCheckin() {
+  localStorage.setItem('whatif_checkin_dismissed', todayStr());
+  document.getElementById('checkinBanner').className = 'checkin-banner';
+}
+
+function maybeShowCheckin() {
+  const dismissed = localStorage.getItem('whatif_checkin_dismissed');
+  const today = todayStr();
+  if (dismissed === today) return;
+  const data = loadData();
+  const todayActivity = data.entries.filter(e => e.date === today);
+  if (!todayActivity.length) {
+    document.getElementById('checkinBanner').className = 'checkin-banner show';
+  }
+}
+
+function renderStreakWall(data) {
+  const wall = document.getElementById('streakWall');
+  const activityMap = {};
+  data.entries.filter(e => e.type === 'save').forEach(e => {
+    const key = e.name.toLowerCase();
+    if (!activityMap[key]) activityMap[key] = { name: e.name, dates: [] };
+    if (!activityMap[key].dates.includes(e.date)) activityMap[key].dates.push(e.date);
+  });
+
+  const bests = Object.values(activityMap).map(a => {
+    const sorted = a.dates.sort().reverse();
+    let best = 1, cur = 1;
+    for (let i = 1; i < sorted.length; i++) {
+      const diff = (new Date(sorted[i-1]) - new Date(sorted[i])) / 86400000;
+      if (diff === 1) { cur++; best = Math.max(best, cur); }
+      else cur = 1;
+    }
+    return { name: a.name, best };
+  }).filter(a => a.best >= 2).sort((a,b) => b.best - a.best).slice(0, 6);
+
+  if (!bests.length) { wall.className = 'streak-wall'; return; }
+  wall.className = 'streak-wall show';
+  const existing = wall.querySelectorAll('.streak-chip');
+  existing.forEach(el => el.remove());
+  bests.forEach(b => {
+    const chip = document.createElement('div');
+    chip.className = 'streak-chip best';
+    chip.textContent = 'Best: ' + b.best + 'd — ' + b.name;
+    wall.appendChild(chip);
+  });
+}
+
 function confirmEntry(verified) {
   if (!pendingEntry) { closeFlash(); return; }
   pendingEntry.verified = verified;
@@ -847,6 +989,8 @@ function render() {
   renderWeekGrid('save', data, wk);
   renderStreakBadge(data, wk);
   renderWeekLabel(wk);
+  renderStreakWall(data);
+  maybeShowCheckin();
 }
 
 function renderFeed(type, data) {
@@ -871,10 +1015,24 @@ function renderFeed(type, data) {
         ? '<span class="verified-badge">deposited</span>'
         : '<span class="unverified-badge">unverified</span>';
     }
+    let projection = '';
+    if (type === 'save') {
+      const r = 0.12 / 12;
+      const p = e.amount;
+      const y1 = Math.round(p * Math.pow(1 + r, 12));
+      const y3 = Math.round(p * Math.pow(1 + r, 36));
+      const y5 = Math.round(p * Math.pow(1 + r, 60));
+      projection = `<div class="projection-row">
+        <div class="proj-item"><span>1 yr</span><span>${fmt(y1)}</span></div>
+        <div class="proj-item"><span>3 yr</span><span>${fmt(y3)}</span></div>
+        <div class="proj-item"><span>5 yr</span><span>${fmt(y5)}</span></div>
+      </div>`;
+    }
     card.innerHTML = `${icon}
       <div class="entry-main">
         <div class="entry-name">${e.name}</div>
         <div class="entry-date">${formatDate(e.date)}</div>
+        ${projection}
       </div>
       <div class="entry-amount">${type==='waste'?'-':'+'} ${fmt(e.amount)}</div>
       ${badge}`;
@@ -990,6 +1148,20 @@ function openReport() {
 
   renderList('rWasteList', wkWaste, 'red');
   renderList('rSaveList', wkSave, 'green');
+
+  // Honesty score
+  const totalSaveAmt = totalSave;
+  const honestyPct = totalSaveAmt > 0 ? Math.round((verified / totalSaveAmt) * 100) : 0;
+  let honestyEl = document.getElementById('honestyWrap');
+  if (!honestyEl) {
+    honestyEl = document.createElement('div');
+    honestyEl.id = 'honestyWrap';
+    honestyEl.className = 'honesty-bar-wrap';
+    honestyEl.innerHTML = '<div class="honesty-label"><span>Honesty Score</span><span id="honestyPct">0%</span></div><div class="honesty-track"><div class="honesty-fill" id="honestyFill"></div></div>';
+    document.getElementById('rVerdict').before(honestyEl);
+  }
+  document.getElementById('honestyPct').textContent = honestyPct + '%';
+  document.getElementById('honestyFill').style.width = honestyPct + '%';
 
   const verdict = document.getElementById('rVerdict');
   if (totalWaste === 0 && totalSave === 0) {
