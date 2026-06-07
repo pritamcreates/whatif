@@ -461,6 +461,11 @@
     font-weight: 500;
   }
   .checkin-banner.show { display: flex; }
+  .checkin-banner.checkin-missed {
+    background: #FFF3E0;
+    border-bottom-color: #FFCC80;
+    color: #6D3B00;
+  }
   .checkin-banner-btns { display: flex; gap: 6px; }
   .checkin-btn {
     height: 24px; padding: 0 10px; border-radius: 20px;
@@ -800,9 +805,16 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 function localDateStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
-function todayStr() { return localDateStr(new Date()); }
+function todayStr() {
+  // Always use Nepal Time (UTC+5:45)
+  const nptOffset = 5 * 60 + 45;
+  const utc = Date.now() + new Date().getTimezoneOffset() * 60000;
+  return localDateStr(new Date(utc + nptOffset * 60000));
+}
 function weekKey() {
-  const d = new Date();
+  const nptOffset = 5 * 60 + 45;
+  const utc = Date.now() + new Date().getTimezoneOffset() * 60000;
+  const d = new Date(utc + nptOffset * 60000);
   const monday = new Date(d);
   monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return localDateStr(monday);
@@ -934,8 +946,9 @@ function getActivityStreak(data, activityName, type) {
 
 function markCleanDay() {
   const data = loadData();
-  const today = todayStr();
-  data.entries.push({ type: 'clean', name: 'Clean day', amount: 0, date: today, verified: true });
+  const banner = document.getElementById('checkinBanner');
+  const targetDate = banner.dataset.backfill || getNPTDateStr(new Date());
+  data.entries.push({ type: 'clean', name: 'Clean day', amount: 0, date: targetDate, verified: true });
   saveData(data);
   dismissCheckin();
   render();
@@ -943,35 +956,79 @@ function markCleanDay() {
 
 function markNeutralDay() {
   const data = loadData();
-  const today = todayStr();
-  // Only log neutral if no entry exists for today at all
-  const hasToday = data.entries.some(e => e.date === today);
+  const banner = document.getElementById('checkinBanner');
+  const targetDate = banner.dataset.backfill || getNPTDateStr(new Date());
+  const hasToday = data.entries.some(e => e.date === targetDate);
   if (!hasToday) {
-    data.entries.push({ type: 'neutral', name: 'Neutral day', amount: 0, date: today, verified: true });
+    data.entries.push({ type: 'neutral', name: 'Neutral day', amount: 0, date: targetDate, verified: true });
     saveData(data);
   }
   dismissCheckin();
   render();
 }
 
+// --- Nepal Time helpers (UTC+5:45) ---
+function getNPTDate(date) {
+  const nptOffset = 5 * 60 + 45;
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  return new Date(utc + nptOffset * 60000);
+}
+function getNPTDateStr(date) {
+  const d = getNPTDate(date);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function getNPTHour(date) { return getNPTDate(date).getHours(); }
+function getYesterdayNPT(date) {
+  const d = getNPTDate(date);
+  d.setDate(d.getDate() - 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function dismissCheckin() {
-  localStorage.setItem('whatif_checkin_dismissed', todayStr());
+  localStorage.setItem('whatif_checkin_dismissed', getNPTDateStr(new Date()));
   document.getElementById('checkinBanner').className = 'checkin-banner';
+  document.getElementById('checkinBanner').removeAttribute('data-backfill');
 }
 
 function maybeShowCheckin() {
+  const now = new Date();
+  const todayNPT = getNPTDateStr(now);
+  const yesterdayNPT = getYesterdayNPT(now);
+  const hourNPT = getNPTHour(now);
   const dismissed = localStorage.getItem('whatif_checkin_dismissed');
-  const today = todayStr();
-  if (dismissed === today) return;
   const data = loadData();
-  const todayActivity = data.entries.filter(e => e.date === today && e.type !== 'neutral');
-  if (!todayActivity.length) {
-    const hasNeutral = data.entries.some(e => e.date === today && e.type === 'neutral');
-    if (!hasNeutral) {
-      document.getElementById('checkinBanner').className = 'checkin-banner show';
-    }
+  const banner = document.getElementById('checkinBanner');
+  const bannerText = banner.querySelector('span');
+
+  // Priority 1: yesterday was completely missed — always surface this
+  const yesterdayLogged = data.entries.some(e => e.date === yesterdayNPT);
+  if (!yesterdayLogged) {
+    bannerText.textContent = "You didn't log anything for " + formatDate(yesterdayNPT) + ". Want to fill it in now?";
+    banner.dataset.backfill = yesterdayNPT;
+    banner.className = 'checkin-banner show checkin-missed';
+    return;
   }
+
+  banner.removeAttribute('data-backfill');
+
+  // Priority 2: today already dismissed
+  if (dismissed === todayNPT) return;
+
+  // Priority 3: already logged today
+  const todayLogged = data.entries.some(e => e.date === todayNPT);
+  if (todayLogged) return;
+
+  // Priority 4: 9 PM evening prompt vs general prompt
+  if (hourNPT >= 21) {
+    bannerText.textContent = "Evening check-in — it's past 9 PM in Nepal. How did today go?";
+  } else {
+    bannerText.textContent = "No entries logged today yet. How's it going?";
+  }
+  banner.className = 'checkin-banner show';
 }
+
+// Auto re-check every minute so the 9 PM banner fires without a page reload
+setInterval(maybeShowCheckin, 60000);
 
 function renderStreakWall(data) {
   const wall = document.getElementById('streakWall');
