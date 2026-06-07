@@ -468,7 +468,45 @@
     cursor: pointer; font-weight: 500;
   }
   .checkin-btn.clean { background: var(--green); color: #fff; border-color: var(--green); }
-  .checkin-btn.dismiss { background: transparent; color: #7A5F00; }
+  .checkin-btn.neutral { background: var(--white); color: #7A5F00; border-color: #D4AF37; }
+  .checkin-btn.dismiss { background: transparent; color: #7A5F00; border-color: transparent; }
+
+  /* NEUTRAL DAY BUTTON in input area */
+  .neutral-day-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    height: 30px;
+    margin-top: 8px;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    letter-spacing: 0.03em;
+  }
+  .neutral-day-btn:hover {
+    background: var(--off);
+    border-color: #B4B2A9;
+    color: var(--text);
+  }
+  .neutral-day-btn.logged {
+    border-style: solid;
+    border-color: #C0DD97;
+    background: #F5FAF0;
+    color: var(--green);
+    cursor: default;
+  }
+  .neutral-day-btn.logged:hover {
+    background: #F5FAF0;
+    border-color: #C0DD97;
+    color: var(--green);
+  }
 
   /* STREAK WALL */
   .streak-wall {
@@ -669,6 +707,7 @@
   <span>How was your day so far? No entries logged today yet.</span>
   <div class="checkin-banner-btns">
     <button class="checkin-btn clean" onclick="markCleanDay()">Clean day — no waste</button>
+    <button class="checkin-btn neutral" onclick="markNeutralDay()">Nothing happened</button>
     <button class="checkin-btn dismiss" onclick="dismissCheckin()">I'll log as I go</button>
   </div>
 </div>
@@ -703,6 +742,9 @@
         <input class="input-amount" id="wasteAmt" type="number" placeholder="₹ amt" min="1">
         <button class="btn-log btn-waste" onclick="logEntry('waste')">Log Waste</button>
       </div>
+      <button class="neutral-day-btn" id="neutralBtn" onclick="markNeutralDay()">
+        <i class="ti ti-minus" aria-hidden="true"></i> Nothing happened today — mark neutral
+      </button>
     </div>
   </div>
 
@@ -899,6 +941,19 @@ function markCleanDay() {
   render();
 }
 
+function markNeutralDay() {
+  const data = loadData();
+  const today = todayStr();
+  // Only log neutral if no entry exists for today at all
+  const hasToday = data.entries.some(e => e.date === today);
+  if (!hasToday) {
+    data.entries.push({ type: 'neutral', name: 'Neutral day', amount: 0, date: today, verified: true });
+    saveData(data);
+  }
+  dismissCheckin();
+  render();
+}
+
 function dismissCheckin() {
   localStorage.setItem('whatif_checkin_dismissed', todayStr());
   document.getElementById('checkinBanner').className = 'checkin-banner';
@@ -909,9 +964,12 @@ function maybeShowCheckin() {
   const today = todayStr();
   if (dismissed === today) return;
   const data = loadData();
-  const todayActivity = data.entries.filter(e => e.date === today);
+  const todayActivity = data.entries.filter(e => e.date === today && e.type !== 'neutral');
   if (!todayActivity.length) {
-    document.getElementById('checkinBanner').className = 'checkin-banner show';
+    const hasNeutral = data.entries.some(e => e.date === today && e.type === 'neutral');
+    if (!hasNeutral) {
+      document.getElementById('checkinBanner').className = 'checkin-banner show';
+    }
   }
 }
 
@@ -977,6 +1035,21 @@ function render() {
   document.getElementById('ratioFill').style.width = savePct + '%';
   document.getElementById('ratioSaved').textContent = fmt(todaySave) + ' saved';
   document.getElementById('ratioWasted').textContent = fmt(todayWaste) + ' wasted';
+
+  // Neutral button state
+  const neutralBtn = document.getElementById('neutralBtn');
+  const hasNeutral = todayEntries.some(e => e.type === 'neutral');
+  const hasActivity = todayEntries.some(e => e.type === 'waste' || e.type === 'save');
+  if (hasNeutral) {
+    neutralBtn.className = 'neutral-day-btn logged';
+    neutralBtn.innerHTML = '<i class="ti ti-check" aria-hidden="true"></i> Neutral day logged';
+  } else if (hasActivity) {
+    neutralBtn.style.display = 'none';
+  } else {
+    neutralBtn.className = 'neutral-day-btn';
+    neutralBtn.style.display = '';
+    neutralBtn.innerHTML = '<i class="ti ti-minus" aria-hidden="true"></i> Nothing happened today — mark neutral';
+  }
 
   const allWaste = data.entries.filter(e=>e.type==='waste').reduce((s,e)=>s+e.amount,0);
   const allSave = data.entries.filter(e=>e.type==='save').reduce((s,e)=>s+e.amount,0);
@@ -1056,15 +1129,19 @@ function renderWeekGrid(type, data, wkStart) {
 
   days7.forEach((d, i) => {
     const amt = data.entries.filter(e=>e.type===type&&e.date===d).reduce((s,e)=>s+e.amount,0);
+    const isNeutral = amt === 0 && data.entries.some(e => e.date === d && e.type === 'neutral');
     const pct = (amt / maxAmt * 100);
     const dayName = DAYS[i % 7];
     const col = document.createElement('div');
     col.className = 'day-col';
     col.innerHTML = `<div class="day-name">${dayName}</div>
-      <div class="day-bar-track">
-        <div class="day-bar-fill ${type === 'waste' ? 'waste-bar' : 'save-bar'}" style="height:${amt>0?Math.max(pct,8):0}%"></div>
+      <div class="day-bar-track" style="${isNeutral ? 'background:#F0EFE8;' : ''}">
+        ${isNeutral
+          ? '<div style="position:absolute;bottom:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><div style="width:5px;height:5px;border-radius:50%;background:var(--border);"></div></div>'
+          : `<div class="day-bar-fill ${type === 'waste' ? 'waste-bar' : 'save-bar'}" style="height:${amt>0?Math.max(pct,8):0}%"></div>`
+        }
       </div>
-      <div class="day-val">${amt > 0 ? ('₹' + (amt >= 1000 ? Math.round(amt/1000)+'k' : amt)) : ''}</div>`;
+      <div class="day-val">${isNeutral ? '–' : (amt > 0 ? ('₹' + (amt >= 1000 ? Math.round(amt/1000)+'k' : amt)) : '')}</div>`;
     grid.appendChild(col);
   });
 }
